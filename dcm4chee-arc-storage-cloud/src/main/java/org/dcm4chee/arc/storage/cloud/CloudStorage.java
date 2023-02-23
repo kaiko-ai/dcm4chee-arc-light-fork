@@ -81,7 +81,7 @@ public class CloudStorage extends AbstractStorage {
     private static final Uploader STREAMING_UPLOADER = new Uploader() {
         @Override
         public void upload(BlobStoreContext context, InputStream in, long length,
-                           BlobStore blobStore, String container, String storagePath) {
+                BlobStore blobStore, String container, String storagePath) {
             Payload payload = new InputStreamPayload(in);
             if (length >= 0)
                 payload.getContentMetadata().setContentLength(length);
@@ -93,6 +93,7 @@ public class CloudStorage extends AbstractStorage {
     private final AttributesFormat pathFormat;
     private final String container;
     private final BlobStoreContext context;
+    private final Properties uploaderProperties;
     private String api;
     private int count;
 
@@ -106,7 +107,8 @@ public class CloudStorage extends AbstractStorage {
         this.device = device;
         pathFormat = new AttributesFormat(descriptor.getProperty("pathFormat", DEFAULT_PATH_FORMAT));
         container = descriptor.getProperty("container", DEFAULT_CONTAINER);
-        if (Boolean.parseBoolean(descriptor.getProperty("containerExists", null))) count++;
+        if (Boolean.parseBoolean(descriptor.getProperty("containerExists", null)))
+            count++;
         api = descriptor.getStorageURI().getSchemeSpecificPart();
         String endpoint = null;
         int endApi = api.indexOf(':');
@@ -120,6 +122,12 @@ public class CloudStorage extends AbstractStorage {
             ctxBuilder.credentials(identity, descriptor.getProperty("credential", null));
         if (endpoint != null)
             ctxBuilder.endpoint(endpoint);
+        uploaderProperties = new Properties();
+        for (Map.Entry<String, String> entry : descriptor.getProperties().entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("uploader."))
+                uploaderProperties.setProperty(key, entry.getValue());
+        }
         Properties overrides = new Properties();
         for (Map.Entry<String, String> entry : descriptor.getProperties().entrySet()) {
             String key = entry.getKey();
@@ -202,7 +210,7 @@ public class CloudStorage extends AbstractStorage {
                 uploader = new S3Uploader();
                 break;
             case "azureblob":
-                uploader = new AzureBlobUploader();
+                uploader = new AzureBlobUploader(uploaderProperties);
                 break;
         }
 

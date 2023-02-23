@@ -40,11 +40,11 @@
 
 package org.dcm4chee.arc.storage.cloud;
 
-import org.jclouds.blobstore.BlobStore;
-import org.jclouds.blobstore.BlobStoreContext;
-
 import java.io.IOException;
 import java.io.InputStream;
+
+import org.jclouds.blobstore.BlobStore;
+import org.jclouds.blobstore.BlobStoreContext;
 
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>

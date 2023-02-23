@@ -44,32 +44,58 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 import org.dcm4chee.arc.storage.CacheInputStream;
+import org.jclouds.azureblob.AzureBlobClient;
+import org.jclouds.azureblob.domain.AccessTier;
 import org.jclouds.blobstore.BlobStore;
 import org.jclouds.blobstore.BlobStoreContext;
 import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.domain.MultipartPart;
 import org.jclouds.blobstore.domain.MultipartUpload;
+import org.jclouds.blobstore.options.PutOptions;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.InputStreamPayload;
-import org.jclouds.blobstore.options.PutOptions;
 
 /**
  * @author Daniil Trishkin <kernel.pryanic@protonmail.com>
  * @since Feb 2023
  */
 class AzureBlobUploader extends CacheInputStream implements Uploader {
+    private final Properties properties;
+
+    protected AzureBlobUploader(Properties properties) {
+        super();
+        this.properties = properties;
+    }
+
     @Override
     public void upload(BlobStoreContext context, InputStream in, long length, BlobStore blobStore,
             String container, String storagePath) throws IOException {
         if (fillBuffers(in))
-            uploadMultipleParts(blobStore, in, container, storagePath);
+            uploadMultipleParts(context, blobStore, in, container, storagePath);
         else
-            uploadSinglePart(blobStore, container, storagePath);
+            uploadSinglePart(context, blobStore, container, storagePath);
+        String tier = properties.getProperty("uploader.tier");
+        if (tier != null) {
+            AzureBlobClient client = context.unwrapApi(AzureBlobClient.class);
+            switch (tier) {
+                case "hot":
+                    client.setBlobTier(container, storagePath, AccessTier.HOT);
+                    break;
+                case "cool":
+                    client.setBlobTier(container, storagePath, AccessTier.COOL);
+                    break;
+                case "archive":
+                    client.setBlobTier(container, storagePath, AccessTier.ARCHIVE);
+                    break;
+            }
+        }
     }
 
-    private void uploadSinglePart(BlobStore blobStore, String container, String storagePath) {
+    private void uploadSinglePart(BlobStoreContext context, BlobStore blobStore,
+            String container, String storagePath) {
         Blob blob = blobStore.blobBuilder(storagePath).payload(createPayload()).build();
         blobStore.putBlob(container, blob);
     }
@@ -80,10 +106,12 @@ class AzureBlobUploader extends CacheInputStream implements Uploader {
         return payload;
     }
 
-    private void uploadMultipleParts(BlobStore blobStore, InputStream in, String container, String storagePath)
+    private void uploadMultipleParts(BlobStoreContext context, BlobStore blobStore,
+            InputStream in, String container, String storagePath)
             throws IOException {
         Blob blob = blobStore.blobBuilder(storagePath).build();
-        MultipartUpload mpu = blobStore.initiateMultipartUpload(container, blob.getMetadata(), new PutOptions().multipart());
+        MultipartUpload mpu = blobStore.initiateMultipartUpload(container, blob.getMetadata(),
+                new PutOptions().multipart());
         List<MultipartPart> parts = new ArrayList<MultipartPart>();
         int partNumber = 1;
         do {
