@@ -51,8 +51,10 @@ import org.dcm4chee.arc.storage.WriteContext;
 import org.jclouds.ContextBuilder;
 import org.jclouds.blobstore.BlobStore;
 import org.jclouds.blobstore.BlobStoreContext;
+import org.jclouds.blobstore.ContainerNotFoundException;
 import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.domain.BlobMetadata;
+import org.jclouds.blobstore.options.CopyOptions;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.InputStreamPayload;
 import org.jclouds.logging.slf4j.config.SLF4JLoggingModule;
@@ -167,6 +169,23 @@ public class CloudStorage extends AbstractStorage {
     @Override
     protected void copyA(InputStream in, WriteContext ctx) throws IOException {
         upload(ctx, in);
+    }
+
+    @Override
+    protected void copyB(ReadContext rc, WriteContext wc) throws IOException {
+        String srcContainer = rc.getStorage().getStorageDescriptor().getProperty("container", DEFAULT_CONTAINER);
+        BlobStore blobStore = context.getBlobStore();
+        String srcStoragePath = pathFormat.format(rc.getStoragePath());
+        String dstStoragePath = pathFormat.format(wc.getAttributes());
+        if (count++ == 0 && !blobStore.containerExists(container))
+            blobStore.createContainerInLocation(null, container);
+        else {
+            while (blobStore.blobExists(container, dstStoragePath))
+                dstStoragePath = dstStoragePath.substring(0, dstStoragePath.lastIndexOf('/') + 1)
+                        .concat(String.format("%08X", ThreadLocalRandom.current().nextInt()));
+        }
+        blobStore.copyBlob(srcContainer, srcStoragePath, container, dstStoragePath, CopyOptions.NONE);
+        wc.setStoragePath(dstStoragePath);
     }
 
     @Override

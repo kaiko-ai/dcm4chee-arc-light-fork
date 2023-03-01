@@ -39,7 +39,7 @@
  *
  */
 
-package org.dcm4che.arc.export.storage;
+package org.dcm4che.arc.export.cloud;
 
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.net.ApplicationEntity;
@@ -74,18 +74,18 @@ import java.util.stream.Collectors;
 import java.util.function.Predicate;
 
 /**
- * @author Gunter Zeilinger <gunterze@gmail.com>
- * @since April 2018
+ * @author Daniil Trishkin <kernel.pryanic@protonmail.com>
+ * @since March 2022
  */
-public class StorageExporter extends AbstractExporter {
+public class CloudExporter extends AbstractExporter {
 
-    private static Logger LOG = LoggerFactory.getLogger(StorageExporter.class);
+    private static Logger LOG = LoggerFactory.getLogger(CloudExporter.class);
 
     private final RetrieveService retrieveService;
     private final StoreService storeService;
     private final StorageFactory storageFactory;
 
-    public StorageExporter(ExporterDescriptor descriptor, RetrieveService retrieveService,
+    public CloudExporter(ExporterDescriptor descriptor, RetrieveService retrieveService,
                            StoreService storeService, StorageFactory storageFactory) {
         super(descriptor);
         this.retrieveService = retrieveService;
@@ -170,21 +170,6 @@ public class StorageExporter extends AbstractExporter {
 
     private Location copyTo(RetrieveContext rtc, InstanceLocations inst,
                             Storage storage, WriteContext wc) throws IOException {
-        if (descriptor.getProperty("streaming", null) == null) { 
-            try (LocationInputStream locationInputStream = retrieveService.openLocationInputStream(
-                    rtc, inst)) {
-                wc.setContentLength(locationInputStream.location.getSize());
-                storage.copy(locationInputStream.stream, wc);
-                return new Location.Builder()
-                        .storageID(storage.getStorageDescriptor().getStorageID())
-                        .storagePath(wc.getStoragePath())
-                        .transferSyntaxUID(locationInputStream.location.getTransferSyntaxUID())
-                        .objectType(Location.ObjectType.DICOM_FILE)
-                        .size(locationInputStream.location.getSize())
-                        .digest(locationInputStream.location.getDigest())
-                        .build();
-            }
-        } else {
             ArrayList<Predicate<Location>> predicates = new ArrayList<Predicate<Location>>();
             predicates.add((Location l) -> l.getStorageID() == storage.getStorageDescriptor().getStorageID());
             List<Location> locations = retrieveService.findValidLocations(rtc, inst, predicates);
@@ -217,5 +202,4 @@ public class StorageExporter extends AbstractExporter {
 
             throw new IOException("Failed to copy " + inst);
         }
-    }
 }
