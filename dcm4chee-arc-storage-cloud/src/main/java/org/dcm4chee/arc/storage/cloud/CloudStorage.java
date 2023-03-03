@@ -173,9 +173,9 @@ public class CloudStorage extends AbstractStorage {
 
     @Override
     protected void copyB(ReadContext rc, WriteContext wc) throws IOException {
-        String srcContainer = rc.getStorage().getStorageDescriptor().getProperty("container", DEFAULT_CONTAINER);
         BlobStore blobStore = context.getBlobStore();
-        String srcStoragePath = pathFormat.format(rc.getStoragePath());
+        String srcContainer = rc.getStorage().getStorageDescriptor().getProperty("container", DEFAULT_CONTAINER);
+        String srcStoragePath = rc.getStoragePath();
         String dstStoragePath = pathFormat.format(wc.getAttributes());
         if (count++ == 0 && !blobStore.containerExists(container))
             blobStore.createContainerInLocation(null, container);

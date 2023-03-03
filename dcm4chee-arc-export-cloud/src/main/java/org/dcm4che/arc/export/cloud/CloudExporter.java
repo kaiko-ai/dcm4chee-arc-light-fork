@@ -41,37 +41,37 @@
 
 package org.dcm4che.arc.export.cloud;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.net.ApplicationEntity;
 import org.dcm4chee.arc.conf.ArchiveAEExtension;
+import org.dcm4chee.arc.conf.ArchiveDeviceExtension;
+import org.dcm4chee.arc.conf.Availability;
 import org.dcm4chee.arc.conf.ExporterDescriptor;
 import org.dcm4chee.arc.entity.Location;
 import org.dcm4chee.arc.entity.Task;
 import org.dcm4chee.arc.exporter.AbstractExporter;
 import org.dcm4chee.arc.exporter.ExportContext;
 import org.dcm4chee.arc.qmgt.Outcome;
-import org.dcm4chee.arc.store.InstanceLocations;
 import org.dcm4chee.arc.retrieve.RetrieveContext;
 import org.dcm4chee.arc.retrieve.RetrieveService;
-import org.dcm4chee.arc.retrieve.LocationInputStream;
 import org.dcm4chee.arc.storage.ReadContext;
 import org.dcm4chee.arc.storage.Storage;
 import org.dcm4chee.arc.storage.StorageFactory;
 import org.dcm4chee.arc.storage.WriteContext;
+import org.dcm4chee.arc.store.InstanceLocations;
 import org.dcm4chee.arc.store.StoreService;
 import org.dcm4chee.arc.store.StoreSession;
 import org.dcm4chee.arc.store.UpdateLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.function.Predicate;
 
 /**
  * @author Daniil Trishkin <kernel.pryanic@protonmail.com>
@@ -81,12 +81,14 @@ public class CloudExporter extends AbstractExporter {
 
     private static Logger LOG = LoggerFactory.getLogger(CloudExporter.class);
 
+    private final static String cloudSchema = "jclouds";
+
     private final RetrieveService retrieveService;
     private final StoreService storeService;
     private final StorageFactory storageFactory;
 
     public CloudExporter(ExporterDescriptor descriptor, RetrieveService retrieveService,
-                           StoreService storeService, StorageFactory storageFactory) {
+            StoreService storeService, StorageFactory storageFactory) {
         super(descriptor);
         this.retrieveService = retrieveService;
         this.storeService = storeService;
@@ -113,18 +115,30 @@ public class CloudExporter extends AbstractExporter {
             if (!retrieveService.calculateMatches(retrieveContext))
                 return new Outcome(Task.Status.WARNING, noMatches(exportContext));
 
+            Storage storage = retrieveService.getStorage(storageID, retrieveContext);
+            if (!storage.getStorageDescriptor().getStorageURI().getScheme().equals(cloudSchema)) {
+                return new Outcome(Task.Status.WARNING, String.format("{} is not a cloud storage", storageID));
+            }
+
             try {
                 Set<String> seriesIUIDs = new HashSet<>();
-                Storage storage = retrieveService.getStorage(storageID, retrieveContext);
                 retrieveContext.setDestinationStorage(storage.getStorageDescriptor());
                 for (InstanceLocations instanceLocations : retrieveContext.getMatches()) {
-                    Map<Boolean, List<Location>> locationsOnStorageByStatusOK =
-                            instanceLocations.getLocations().stream()
-                                .filter(l -> l.getStorageID().equals(storageID))
-                                .collect(Collectors.partitioningBy(Location::isStatusOK));
+                    // Checking for existing locations on the destination device
+                    Map<Boolean, List<Location>> locationsOnStorageByStatusOK = instanceLocations.getLocations()
+                            .stream()
+                            .filter(l -> l.getStorageID().equals(storageID))
+                            .collect(Collectors.partitioningBy(Location::isStatusOK));
                     if (!locationsOnStorageByStatusOK.get(Boolean.TRUE).isEmpty()) {
-                        retrieveContext.setNumberOfMatches(retrieveContext.getNumberOfMatches()-1);
+                        retrieveContext.setNumberOfMatches(retrieveContext.getNumberOfMatches() - 1);
                         continue;
+                    }
+
+                    // Getting all valid locations on the same cloud
+                    List<Location> locations = getValidLocations(instanceLocations,
+                            parseStorageURL(storage.getStorageDescriptor().getStorageURIStr()).get("cloud"));
+                    if (locations == null || locations.isEmpty()) {
+                        throw new IOException("Failed to find location of " + instanceLocations);
                     }
 
                     WriteContext writeCtx = storage.createWriteContext();
@@ -133,7 +147,7 @@ public class CloudExporter extends AbstractExporter {
                     Location location = null;
                     try {
                         LOG.debug("Start copying {} to {}:\n", instanceLocations, storage.getStorageDescriptor());
-                        location = copyTo(retrieveContext, instanceLocations, storage, writeCtx);
+                        location = copyTo(retrieveContext, instanceLocations, locations, storage, writeCtx);
                         storeService.replaceLocation(storeSession, instanceLocations.getInstancePk(),
                                 location, locationsOnStorageByStatusOK.get(Boolean.FALSE));
                         storage.commitStorage(writeCtx);
@@ -168,23 +182,62 @@ public class CloudExporter extends AbstractExporter {
         }
     }
 
-    private Location copyTo(RetrieveContext rtc, InstanceLocations inst,
-                            Storage storage, WriteContext wc) throws IOException {
-            ArrayList<Predicate<Location>> predicates = new ArrayList<Predicate<Location>>();
-            predicates.add((Location l) -> l.getStorageID() == storage.getStorageDescriptor().getStorageID());
-            List<Location> locations = retrieveService.findValidLocations(rtc, inst, predicates);
+    private Map<String, String> parseStorageURL(String url) {
+        Map<String, String> parts = new HashMap<>();
+        parts.put("schema", "");
+        parts.put("cloud", "");
+        parts.put("address", "");
 
-            if (locations == null || locations.isEmpty()) {
-                throw new IOException("Failed to find location of " + inst);
-            }
+        String[] split = url.split(":");
+        if (split.length > 0) {
+            parts.put("schema", split[0]);
+        }
+        if (split.length > 1) {
+            parts.put("cloud", split[1]);
+        }
+        if (split.length > 2) {
+            parts.put("address", split[2]);
+        }
 
-            for (Location location : locations) {
-                ReadContext rc = storage.createReadContext();
-                rc.setStoragePath(location.getStoragePath());
-                rc.setStudyInstanceUID(inst.getAttributes().getString(Tag.StudyInstanceUID));
-                try {
-                    storage.copy(rc, wc);
-                    return new Location.Builder()
+        return parts;
+    }
+
+    private List<Location> getValidLocations(InstanceLocations instanceLocations, String cloud)
+            throws IOException {
+        ArchiveDeviceExtension arcdev = retrieveService.getArchiveDeviceExtension();
+        // LOG.info(String.format("CLOUD 0 %s", cloud));
+        // for (Location l : instanceLocations.getLocations()) {
+        //     LOG.info(String.format("CLOUD 1 %s", parseStorageURL(
+        //             arcdev.getStorageDescriptor(l.getStorageID()).getStorageURIStr())
+        //             .get("cloud")));
+        // }
+        Map<Availability, List<Location>> locationsByAvailability = instanceLocations.getLocations().stream()
+                .filter(Location::isDicomFile)
+                .filter(l -> parseStorageURL(
+                        arcdev.getStorageDescriptor(l.getStorageID()).getStorageURIStr())
+                        .get("cloud").equals(cloud))
+                .collect(Collectors.groupingBy(
+                        l -> arcdev.getStorageDescriptor(l.getStorageID()).getInstanceAvailability()));
+
+        List<Location> locations = locationsByAvailability.get(Availability.ONLINE);
+        if (locations == null)
+            locations = locationsByAvailability.get(Availability.NEARLINE);
+        if (locations == null)
+            locations = locationsByAvailability.get(Availability.OFFLINE);
+
+        return locations;
+    }
+
+    private Location copyTo(RetrieveContext retrieveContext, InstanceLocations instanceLocations,
+            List<Location> locations, Storage storage, WriteContext wc) throws IOException {
+        for (Location location : locations) {
+            Storage sourceStorage = retrieveService.getStorage(location.getStorageID(), retrieveContext);
+            ReadContext rc = sourceStorage.createReadContext();
+            rc.setStoragePath(location.getStoragePath());
+            rc.setStudyInstanceUID(instanceLocations.getAttributes().getString(Tag.StudyInstanceUID));
+            try {
+                storage.copy(rc, wc);
+                return new Location.Builder()
                         .storageID(storage.getStorageDescriptor().getStorageID())
                         .storagePath(wc.getStoragePath())
                         .transferSyntaxUID(location.getTransferSyntaxUID())
@@ -192,14 +245,13 @@ public class CloudExporter extends AbstractExporter {
                         .size(location.getSize())
                         .digest(location.getDigest())
                         .build();
-                } catch (Exception e) {
-                    LOG.warn("Failed to copy {} from {}:\n{}", inst, location, e);
-                    rtc.getUpdateLocations().add(
-                        new UpdateLocation(inst, location, Location.Status.MISSING_OBJECT, null)
-                    );
-                }
+            } catch (Exception e) {
+                LOG.warn("Failed to copy {} from {}:\n{}", instanceLocations, location, e);
+                retrieveContext.getUpdateLocations().add(
+                        new UpdateLocation(instanceLocations, location, Location.Status.MISSING_OBJECT, null));
             }
-
-            throw new IOException("Failed to copy " + inst);
         }
+
+        throw new IOException("Failed to copy " + instanceLocations);
+    }
 }

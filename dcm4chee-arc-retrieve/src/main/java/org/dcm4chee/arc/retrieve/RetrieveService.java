@@ -55,10 +55,8 @@ import org.dcm4chee.arc.conf.ArchiveAttributeCoercion;
 import org.dcm4chee.arc.conf.ArchiveAttributeCoercion2;
 import org.dcm4chee.arc.conf.ArchiveDeviceExtension;
 import org.dcm4chee.arc.entity.Series;
-import org.dcm4chee.arc.entity.Location;
 import org.dcm4chee.arc.metrics.MetricsService;
 import org.dcm4chee.arc.keycloak.HttpServletRequestInfo;
-import org.dcm4chee.arc.storage.ReadContext;
 import org.dcm4chee.arc.storage.Storage;
 import org.dcm4chee.arc.store.InstanceLocations;
 import org.dcm4chee.arc.store.StoreService;
@@ -140,9 +138,6 @@ public interface RetrieveService {
 
     LocationInputStream openLocationInputStream(RetrieveContext ctx, InstanceLocations inst)
             throws IOException;
-
-    List<Location> findValidLocations(RetrieveContext ctx, InstanceLocations inst,
-        List<java.util.function.Predicate<Location>> predicates) throws IOException;
 
     Storage getStorage(String storageID, RetrieveContext ctx);
 

@@ -54,24 +54,20 @@ import org.dcm4chee.arc.store.InstanceLocations;
 import org.dcm4chee.arc.retrieve.RetrieveContext;
 import org.dcm4chee.arc.retrieve.RetrieveService;
 import org.dcm4chee.arc.retrieve.LocationInputStream;
-import org.dcm4chee.arc.storage.ReadContext;
 import org.dcm4chee.arc.storage.Storage;
 import org.dcm4chee.arc.storage.StorageFactory;
 import org.dcm4chee.arc.storage.WriteContext;
 import org.dcm4chee.arc.store.StoreService;
 import org.dcm4chee.arc.store.StoreSession;
-import org.dcm4chee.arc.store.UpdateLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.function.Predicate;
 
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>
@@ -168,54 +164,20 @@ public class StorageExporter extends AbstractExporter {
         }
     }
 
-    private Location copyTo(RetrieveContext rtc, InstanceLocations inst,
-                            Storage storage, WriteContext wc) throws IOException {
-        if (descriptor.getProperty("streaming", null) == null) { 
-            try (LocationInputStream locationInputStream = retrieveService.openLocationInputStream(
-                    rtc, inst)) {
-                wc.setContentLength(locationInputStream.location.getSize());
-                storage.copy(locationInputStream.stream, wc);
-                return new Location.Builder()
-                        .storageID(storage.getStorageDescriptor().getStorageID())
-                        .storagePath(wc.getStoragePath())
-                        .transferSyntaxUID(locationInputStream.location.getTransferSyntaxUID())
-                        .objectType(Location.ObjectType.DICOM_FILE)
-                        .size(locationInputStream.location.getSize())
-                        .digest(locationInputStream.location.getDigest())
-                        .build();
-            }
-        } else {
-            ArrayList<Predicate<Location>> predicates = new ArrayList<Predicate<Location>>();
-            predicates.add((Location l) -> l.getStorageID() == storage.getStorageDescriptor().getStorageID());
-            List<Location> locations = retrieveService.findValidLocations(rtc, inst, predicates);
-
-            if (locations == null || locations.isEmpty()) {
-                throw new IOException("Failed to find location of " + inst);
-            }
-
-            for (Location location : locations) {
-                ReadContext rc = storage.createReadContext();
-                rc.setStoragePath(location.getStoragePath());
-                rc.setStudyInstanceUID(inst.getAttributes().getString(Tag.StudyInstanceUID));
-                try {
-                    storage.copy(rc, wc);
-                    return new Location.Builder()
-                        .storageID(storage.getStorageDescriptor().getStorageID())
-                        .storagePath(wc.getStoragePath())
-                        .transferSyntaxUID(location.getTransferSyntaxUID())
-                        .objectType(Location.ObjectType.DICOM_FILE)
-                        .size(location.getSize())
-                        .digest(location.getDigest())
-                        .build();
-                } catch (Exception e) {
-                    LOG.warn("Failed to copy {} from {}:\n{}", inst, location, e);
-                    rtc.getUpdateLocations().add(
-                        new UpdateLocation(inst, location, Location.Status.MISSING_OBJECT, null)
-                    );
-                }
-            }
-
-            throw new IOException("Failed to copy " + inst);
+    private Location copyTo(RetrieveContext retrieveContext, InstanceLocations instanceLocations,
+                            Storage storage, WriteContext writeCtx) throws IOException {
+        try (LocationInputStream locationInputStream = retrieveService.openLocationInputStream(
+                retrieveContext, instanceLocations)) {
+            writeCtx.setContentLength(locationInputStream.location.getSize());
+            storage.copy(locationInputStream.stream, writeCtx);
+            return new Location.Builder()
+                    .storageID(storage.getStorageDescriptor().getStorageID())
+                    .storagePath(writeCtx.getStoragePath())
+                    .transferSyntaxUID(locationInputStream.location.getTransferSyntaxUID())
+                    .objectType(Location.ObjectType.DICOM_FILE)
+                    .size(locationInputStream.location.getSize())
+                    .digest(locationInputStream.location.getDigest())
+                    .build();
         }
     }
 }

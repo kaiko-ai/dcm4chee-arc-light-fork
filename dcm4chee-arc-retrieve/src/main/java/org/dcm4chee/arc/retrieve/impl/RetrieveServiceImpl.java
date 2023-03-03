@@ -93,7 +93,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -1044,19 +1043,14 @@ public class RetrieveServiceImpl implements RetrieveService {
     }
 
     @Override
-    public List<Location> findValidLocations(RetrieveContext ctx, InstanceLocations inst,
-            List<java.util.function.Predicate<Location>> predicates) throws IOException {
+    public LocationInputStream openLocationInputStream(RetrieveContext ctx, InstanceLocations inst)
+            throws IOException {
         String studyInstanceUID = inst.getAttributes().getString(Tag.StudyInstanceUID);
         ArchiveDeviceExtension arcdev = getArchiveDeviceExtension();
-        Stream<Location> s = inst.getLocations().stream().filter(Location::isDicomFile);
-        if (predicates != null && !predicates.isEmpty()) {
-            s = s.filter(p -> predicates.stream().allMatch(f -> f.test(p)));
-        }
-        Map<Availability, List<Location>> locationsByAvailability = s.collect(
-            Collectors.groupingBy(
-                l -> arcdev.getStorageDescriptor(l.getStorageID()).getInstanceAvailability()
-            )
-        );
+        Map<Availability, List<Location>> locationsByAvailability = inst.getLocations()
+                .stream().filter(Location::isDicomFile)
+                .collect(Collectors.groupingBy(l -> arcdev
+                        .getStorageDescriptor(l.getStorageID()).getInstanceAvailability()));
 
         List<Location> locations = locationsByAvailability.get(Availability.ONLINE);
         if (locations == null)
@@ -1064,39 +1058,9 @@ public class RetrieveServiceImpl implements RetrieveService {
         else if (locationsByAvailability.containsKey(Availability.NEARLINE))
             locations.addAll(locationsByAvailability.get(Availability.NEARLINE));
 
-        List<Location> validLocations = new ArrayList<Location>();
-        for (Location location : locations) {
-            LOG.debug("Checking location {} of {}", location, inst);
-            Storage storage = getStorage(location.getStorageID(), ctx);
-            ReadContext readContext = createReadContext(storage, location.getStoragePath(), studyInstanceUID);
-            if (storage.exists(readContext)) {
-                validLocations.add(location);
-            } else {
-                if (!exists(location)) {
-                    LOG.warn("{} of {} no longer exists", location, inst);
-                    ctx.incrementMissing();
-                } else {
-                    LOG.warn(
-                        "Database is desynchronyzed, {} at {} still has a record in the table but isn't present in the storage",
-                        inst, location
-                    );
-                }
-            }
-        }
-
-        return validLocations;
-    }
-
-    @Override
-    public LocationInputStream openLocationInputStream(RetrieveContext ctx, InstanceLocations inst)
-            throws IOException {
-        String studyInstanceUID = inst.getAttributes().getString(Tag.StudyInstanceUID);
-        List<Location> locations = findValidLocations(ctx, inst, null);
-
         if (locations == null || locations.isEmpty()) {
             throw new IOException("Failed to find location of " + inst);
         }
-
         IOException ex = null;
         for (Location location : locations) {
             try {
