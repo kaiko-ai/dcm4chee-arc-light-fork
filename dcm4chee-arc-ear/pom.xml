@@ -52,6 +52,10 @@
   <artifactId>dcm4chee-arc-ear</artifactId>
   <packaging>ear</packaging>
 
+  <properties>
+    <netty-codec.version>4.1.87.Final</netty-codec.version>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.dcm4che.dcm4chee-arc</groupId>
@@ -406,6 +410,11 @@
     </dependency>
     <dependency>
       <groupId>org.dcm4che.dcm4chee-arc</groupId>
+      <artifactId>dcm4chee-arc-storage-cloud-azure</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.dcm4che.dcm4chee-arc</groupId>
       <artifactId>dcm4chee-arc-storage-emc-ecs</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -531,6 +540,12 @@
       <version>${project.version}</version>
       <type>war</type>
       <classifier>${dcm4chee-arc-proxy-classifier}</classifier>
+    </dependency>
+    <!-- Workaround for the wrong netty-codec version that comes with azure-storage-blob -->
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec</artifactId>
+      <version>${netty-codec.version}</version>
     </dependency>
   </dependencies>
 

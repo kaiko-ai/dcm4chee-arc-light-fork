@@ -207,6 +207,33 @@ public abstract class AbstractStorage implements Storage {
     }
 
     @Override
+    public void copy(ReadContext rc, WriteContext wc) throws IOException {
+        checkAccessable();
+        int retries = descriptor.getMaxRetries();
+        Duration retryDelay = descriptor.getRetryDelay();
+        for (;;) {
+            try {
+                long startTime = System.nanoTime();
+                copyA(rc, wc);
+                metricsService.acceptDataRate("write-to-" + descriptor.getStorageID(),
+                        wc.getContentLength(), startTime);
+                return;
+            } catch (IOException e) {
+                if (--retries < 0)
+                    throw e;
+                log().info("Failed to write to {} - retry:\n", descriptor, e);
+                if (retryDelay != null) {
+                    try {
+                        Thread.sleep(retryDelay.getSeconds() * 1000);
+                    } catch (InterruptedException ie) {
+                        log().info("Delay of retry got interrupted:\n", ie);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
     public void deleteObject(String storagePath) throws IOException {
         checkAccessable();
         long startTime = System.nanoTime();
@@ -234,6 +261,10 @@ public abstract class AbstractStorage implements Storage {
     protected abstract OutputStream openOutputStreamA(WriteContext ctx) throws IOException;
 
     protected void copyA(InputStream in, WriteContext ctx) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    protected void copyA(ReadContext rc, WriteContext wc) throws IOException {
         throw new UnsupportedOperationException();
     }
 
