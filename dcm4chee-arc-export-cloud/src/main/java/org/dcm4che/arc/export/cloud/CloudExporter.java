@@ -82,7 +82,7 @@ public class CloudExporter extends AbstractExporter {
 
     private static Logger LOG = LoggerFactory.getLogger(CloudExporter.class);
 
-    private final static List<String> cloudSchemas = Arrays.asList("azure");
+    private final static List<String> cloudSchemas = Arrays.asList("azureblob");
 
     private final RetrieveService retrieveService;
     private final StoreService storeService;

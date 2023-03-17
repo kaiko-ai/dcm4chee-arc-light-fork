@@ -55,7 +55,7 @@ import javax.inject.Named;
  * @since March 2023
  */
 @ApplicationScoped
-@Named("azure")
+@Named("azureblob")
 public class AzureCloudStorageProvider implements StorageProvider {
 
     @Inject
