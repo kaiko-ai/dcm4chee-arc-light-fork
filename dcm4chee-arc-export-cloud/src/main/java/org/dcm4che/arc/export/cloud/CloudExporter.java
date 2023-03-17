@@ -106,6 +106,13 @@ public class CloudExporter extends AbstractExporter {
                 exportContext.getSopInstanceUID())) {
             retrieveContext.setHttpServletRequestInfo(exportContext.getHttpServletRequestInfo());
             String storageID = descriptor.getExportURI().getSchemeSpecificPart();
+            Storage storage = retrieveService.getStorage(storageID, retrieveContext);
+            StorageDescriptor storageDescriptor = storage.getStorageDescriptor();
+            String storageSchema = storageDescriptor.getStorageURI().getScheme();
+            if (!cloudSchemas.contains(storageSchema)) {
+                return new Outcome(Task.Status.WARNING, String.format("{} is not a cloud storage", storageID));
+            }
+
             ApplicationEntity ae = retrieveContext.getLocalApplicationEntity();
             StoreSession storeSession = storeService.newStoreSession(ae).withObjectStorageID(storageID);
             storeService.restoreInstances(
@@ -115,13 +122,6 @@ public class CloudExporter extends AbstractExporter {
                     ae.getAEExtensionNotNull(ArchiveAEExtension.class).purgeInstanceRecordsDelay());
             if (!retrieveService.calculateMatches(retrieveContext))
                 return new Outcome(Task.Status.WARNING, noMatches(exportContext));
-
-            Storage storage = retrieveService.getStorage(storageID, retrieveContext);
-            StorageDescriptor storageDescriptor = storage.getStorageDescriptor();
-            String storageSchema = storageDescriptor.getStorageURI().getScheme();
-            if (!cloudSchemas.contains(storageSchema)) {
-                return new Outcome(Task.Status.WARNING, String.format("{} is not a cloud storage", storageID));
-            }
 
             try {
                 Set<String> seriesIUIDs = new HashSet<>();
