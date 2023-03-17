@@ -16,8 +16,8 @@
  * Java(TM), hosted at https://github.com/dcm4che.
  *
  * The Initial Developer of the Original Code is
- * J4Care.
- * Portions created by the Initial Developer are Copyright (C) 2015-2018
+ * Kaiko BV
+ * Portions created by the Initial Developer are Copyright (C) 2023
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -53,7 +53,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 /**
- * @author Daniil Trishkin <kernel.pryanic@protonmail.com>
+ * @author Daniil Trishkin <daniil@kaiko.ai>
  * @since March 2022
  */
 @ApplicationScoped

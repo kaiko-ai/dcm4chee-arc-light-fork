@@ -16,8 +16,8 @@
  * Java(TM), hosted at https://github.com/dcm4che.
  *
  * The Initial Developer of the Original Code is
- * Kaiko.
- * Portions created by the Initial Developer are Copyright (C) 2015
+ * Kaiko BV
+ * Portions created by the Initial Developer are Copyright (C) 2023
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -73,7 +73,7 @@ import com.azure.storage.blob.models.AccessTier;
 
 /**
  * @author Daniil Trishkin <daniil@kaiko.ai>
- * @since Mar 2023
+ * @since March 2023
  */
 public class AzureCloudStorage extends AbstractStorage {
 

@@ -16,8 +16,8 @@
  * Java(TM), hosted at https://github.com/dcm4che.
  *
  * The Initial Developer of the Original Code is
- * J4Care.
- * Portions created by the Initial Developer are Copyright (C) 2015
+ * Kaiko BV
+ * Portions created by the Initial Developer are Copyright (C) 2023
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -47,7 +47,7 @@ import java.util.concurrent.FutureTask;
 
 /**
  * @author Daniil Trishkin <daniil@kaiko.ai>
- * @since Mar 2023
+ * @since March 2023
  */
 public class AzureCloudWriteContext extends DefaultWriteContext {
 
