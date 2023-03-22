@@ -48,6 +48,7 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.file.NoSuchFileException;
+import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -76,6 +77,7 @@ import com.azure.storage.blob.models.AccessTier;
  * @since March 2023
  */
 public class AzureCloudStorage extends AbstractStorage {
+    public final static String emailsProperty = "notification.emails";
 
     private static final Logger LOG = LoggerFactory.getLogger(AzureCloudStorage.class);
     private static final String DEFAULT_API_VERSION = "V2021_12_02";
@@ -207,6 +209,8 @@ public class AzureCloudStorage extends AbstractStorage {
         blobClient.beginCopy(
                 String.join("/", endpoint, srcContainer, srcStoragePath), null,
                 tier, null, null, null, null);
+        blobClient.setMetadata(Collections.singletonMap(emailsProperty,
+                wc.getAttributes().getProperty(emailsProperty, null).toString()));
         wc.setStoragePath(storagePath);
     }
 

@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.dcm4che3.data.Attributes;
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.net.ApplicationEntity;
 import org.dcm4chee.arc.conf.ArchiveAEExtension;
@@ -79,10 +80,10 @@ import org.slf4j.LoggerFactory;
  * @since March 2022
  */
 public class CloudExporter extends AbstractExporter {
+    public final static List<String> cloudSchemas = Arrays.asList("azureblob");
+    public final static String emailsProperty = "notification.emails";
 
     private static Logger LOG = LoggerFactory.getLogger(CloudExporter.class);
-
-    private final static List<String> cloudSchemas = Arrays.asList("azureblob");
 
     private final RetrieveService retrieveService;
     private final StoreService storeService;
@@ -144,8 +145,13 @@ public class CloudExporter extends AbstractExporter {
                     }
 
                     WriteContext writeCtx = storage.createWriteContext();
-                    writeCtx.setAttributes(instanceLocations.getAttributes());
+                    Attributes attrs = instanceLocations.getAttributes();
                     writeCtx.setStudyInstanceUID(studyIUID);
+
+                    // Setting rehydration notification email list
+                    attrs.setProperty(emailsProperty, descriptor.getProperty(emailsProperty, null));
+                    writeCtx.setAttributes(attrs);
+
                     Location location = null;
                     try {
                         LOG.debug("Start copying {} to {}:\n", instanceLocations, storageDescriptor);
