@@ -93,8 +93,10 @@ public class AzureCloudStorage extends AbstractStorage {
     private BlobContainerClient containerClient;
 
     @Override
-    public WriteContext createWriteContext() {
-        return new AzureCloudWriteContext(this);
+    public WriteContext createWriteContext(String storagePath) {
+        WriteContext wc = new AzureCloudWriteContext(this);
+        wc.setStoragePath(storagePath);
+        return wc;
     }
 
     protected AzureCloudStorage(StorageDescriptor descriptor, MetricsService metricsService, Device device) {
@@ -188,7 +190,7 @@ public class AzureCloudStorage extends AbstractStorage {
     }
 
     private void upload(InputStream in, WriteContext wc) throws IOException {
-        String storagePath = pathFormat.format(wc.getAttributes());
+        String storagePath = wc.getStoragePath();
         BlobClient blobClient = containerClient.getBlobClient(storagePath);
         if (!containerClient.exists())
             containerClient.create();
@@ -199,7 +201,7 @@ public class AzureCloudStorage extends AbstractStorage {
     }
 
     private void upload(ReadContext rc, WriteContext wc) throws IOException {
-        String storagePath = pathFormat.format(wc.getAttributes());
+        String storagePath = wc.getStoragePath();
         BlobClient blobClient = containerClient.getBlobClient(storagePath);
         if (!containerClient.exists())
             containerClient.create();
