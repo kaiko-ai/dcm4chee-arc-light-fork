@@ -42,6 +42,8 @@ package org.dcm4chee.arc.storage;
 
 import java.security.MessageDigest;
 
+import org.dcm4che3.data.Attributes;
+
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>
  * @since Aug 2015
@@ -54,6 +56,7 @@ public class DefaultReadContext implements ReadContext {
     private String studyInstanceUID;
     private MessageDigest messageDigest;
     private byte[] digest;
+    private Attributes attrs;
 
     public DefaultReadContext(Storage storage) {
         this.storage = storage;
@@ -115,5 +118,15 @@ public class DefaultReadContext implements ReadContext {
     @Override
     public void setStudyInstanceUID(String studyInstanceUID) {
         this.studyInstanceUID = studyInstanceUID;
+    }
+
+    @Override
+    public Attributes getAttributes() {
+        return attrs;
+    }
+
+    @Override
+    public void setAttributes(Attributes attrs) {
+        this.attrs = attrs;
     }
 }

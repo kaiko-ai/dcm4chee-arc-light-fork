@@ -144,8 +144,8 @@ public class CloudExporter extends AbstractExporter {
                         throw new IOException("Failed to find location of " + instanceLocations);
                     }
 
-                    WriteContext writeCtx = storage.createWriteContext();
                     Attributes attrs = instanceLocations.getAttributes();
+                    WriteContext writeCtx = storage.createWriteContext(storage.storagePathOf(attrs));
                     writeCtx.setStudyInstanceUID(studyIUID);
 
                     // Setting rehydration notification email list

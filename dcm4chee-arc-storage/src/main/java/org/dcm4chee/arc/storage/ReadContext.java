@@ -42,6 +42,8 @@ package org.dcm4chee.arc.storage;
 
 import java.security.MessageDigest;
 
+import org.dcm4che3.data.Attributes;
+
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>
  * @since Aug 2015
@@ -68,4 +70,8 @@ public interface ReadContext {
     String getStudyInstanceUID();
 
     void setStudyInstanceUID(String studyInstanceUID);
+
+    Attributes getAttributes();
+
+    void setAttributes(Attributes attributes);
 }
