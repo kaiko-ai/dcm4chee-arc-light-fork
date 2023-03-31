@@ -1,0 +1,65 @@
+name: CI/CD Workflow
+
+on:
+  pull_request:
+    branches:
+    - master
+  push:
+    branches:
+    - master
+
+jobs:
+  test_and_build:
+    runs-on: ubuntu-latest
+    outputs:
+      project-version: ${{ steps.export-project-version.outputs.project-version }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Set up JDK 11
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'adopt'
+    - name: Build with Maven
+      run: mvn clean install -D db=psql -D secure=all -pl dcm4chee-arc-ear -am
+    - name: Export project version
+      id: export-project-version
+      run: |
+        echo "project-version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: dcm4chee-arc-ear/target/
+
+  docker_build_and_push:
+    if: github.event_name == "push" && github.ref_name == "master"
+    needs: test_and_build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Download build artifacts
+      uses: actions/download-artifact@v2
+      with:
+        name: build-artifacts
+        path: dcm4chee-arc-ear/target/
+    - name: Login to ACR
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGINSERVER }}
+        username: ${{ secrets.SP_ACR_PUSH_ID }}
+        password: ${{ secrets.SP_ACR_PUSH_PASSWORD }}
+    - name: Build Docker image
+      id: build-docker-image
+      run: |
+        IMAGE_CURRENT=${{ secrets.ACR_REGISTRY }}/dcm4chee-arc-light:${{ needs.test_and_build.outputs.project-version }}-${{ github.sha }}
+        IMAGE_LATEST=${{ secrets.ACR_REGISTRY }}/dcm4chee-arc-light:${{ needs.test_and_build.outputs.project-version }}
+        echo "image-current=$IMAGE_CURRENT" >> $GITHUB_ENV
+        echo "image-latest=$IMAGE_LATEST" >> $GITHUB_ENV
+        docker build -t $IMAGE_CURRENT $IMAGE_LATEST .
+    - name: Push Docker image to Azure Container Registry
+      run: |
+        docker push ${{ steps.build-docker-image.outputs.image-current }}
+        docker push ${{ steps.build-docker-image.outputs.image-latest }}
