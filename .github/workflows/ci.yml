@@ -34,9 +34,10 @@ jobs:
         path: dcm4chee-arc-ear/target/*.ear
 
   docker_build_and_push:
-    if: github.event_name == 'push' && github.ref_name == 'master'
+    # if: github.event_name == 'push' && github.ref_name == 'master'
     needs: test_and_build
-    runs-on: ubuntu-latest
+    runs-on:
+    - base
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -45,12 +46,17 @@ jobs:
       with:
         name: build-artifacts
         path: dcm4chee-arc-ear/target/
+    - name: Get ACR secrets
+      id: acr-secrets
+      run: |
+        echo "acr-push-id=$(az keyvault secret show --vault-name kv-kaiko-main-hub --name sp-acr-push-id --query value -o tsv)" >> $GITHUB_OUTPUT
+        echo "acr-push-password=$(az keyvault secret show --vault-name kv-kaiko-main-hub --name sp-acr-push-password --query value -o tsv)" >> $GITHUB_OUTPUT
     - name: Login to ACR
       uses: azure/docker-login@v1
       with:
-        login-server: ${{ secrets.ACR_LOGINSERVER }}
-        username: ${{ secrets.SP_ACR_PUSH_ID }}
-        password: ${{ secrets.SP_ACR_PUSH_PASSWORD }}
+        login-server: kaikoregistry.azurecr.io
+        username: ${{ steps.acr-secrets.outputs.acr-push-id }}
+        password: ${{ steps.acr-secrets.outputs.acr-push-password }}
     - name: Build Docker image
       id: build-docker-image
       run: |
