@@ -490,6 +490,7 @@
     <module>dcm4chee-arc-entity</module>
     <module>dcm4chee-arc-event</module>
     <module>dcm4chee-arc-export</module>
+    <module>dcm4chee-arc-export-cloud</module>
     <module>dcm4chee-arc-export-curve2pr</module>
     <module>dcm4chee-arc-export-dcm2hl7</module>
     <module>dcm4chee-arc-export-dcm2ups</module>
@@ -560,6 +561,7 @@
     <module>dcm4chee-arc-stgcmt-rs</module>
     <module>dcm4chee-arc-storage</module>
     <module>dcm4chee-arc-storage-cloud</module>
+    <module>dcm4chee-arc-storage-cloud-azure</module>
     <module>dcm4chee-arc-storage-emc-ecs</module>
     <module>dcm4chee-arc-storage-filesystem</module>
     <module>dcm4chee-arc-storage-rs</module>

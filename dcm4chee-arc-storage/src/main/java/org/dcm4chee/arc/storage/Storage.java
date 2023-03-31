@@ -35,6 +35,8 @@ public interface Storage extends Closeable {
 
     void copy(InputStream in, WriteContext ctx) throws IOException;
 
+    void copy(ReadContext rc, WriteContext wc) throws IOException;
+
     long getUsableSpace() throws IOException;
 
     long getTotalSpace() throws IOException;
